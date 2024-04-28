@@ -24,3 +24,7 @@
 // view & pure functions
 
 pragma solidity 0.8.19;
+
+contract DecentralizedStableCoin {
+    constructor() {}
+}
