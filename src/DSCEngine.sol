@@ -55,12 +55,16 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__TokenAddresssesAndPriceFeedAddressesMustBeSameLength();
     error DSCEngine__NotAllowedToken();
     error DSCEngine__TransferFailed();
+    error DSCEngine__BreaksHealthFactor(uint256 healthFactor);
 
     ///////////////////
     // State Variables
     ///////////////////
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
     uint256 private constant PRECISION = 1e18;
+    uint256 private constant LIQUIDATION_THRESHOLD = 50; // This means you need to be 200% over-collateralized
+    uint256 private constant LIQUIDATION_PRECISION = 100;
+    uint256 private constant MIN_HEALTH_FACTOR = 1;
 
     mapping(address collateralToken => address priceFeed) private s_priceFeeds;
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
@@ -143,9 +147,7 @@ contract DSCEngine is ReentrancyGuard {
      */
     function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint) nonReentrant {
         s_dscMinted[msg.sender] += amountDscToMint;
-        // Declare the function revertIfHealthFactorIsBroken
-
-        revertIfHealthFactorIsBroken(msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
     }
 
     function burnDsc() external {}
@@ -172,11 +174,17 @@ contract DSCEngine is ReentrancyGuard {
      * If a user goes below 1, then they are get liquidated
      */
     function _healthFactor(address user) private view returns (uint256) {
-        (uint256 totalCollateralValue, uint256 totalDscValue) = __getAccountInformation(user);
+        (uint256 totalDscMinted, uint256 totalCollateralValueInUsd) = __getAccountInformation(user);
+        uint256 collateralAdjustedForThreshold =
+            (totalCollateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+        return (collateralAdjustedForThreshold * PRECISION) / totalDscMinted;
     }
 
-    function revertIfHealthFactorIsBroken(address user) internal view {
-        // Implementation of the function
+    function _revertIfHealthFactorIsBroken(address user) internal view {
+        uint256 userHealthFactor = _healthFactor(user);
+        if (userHealthFactor < MIN_HEALTH_FACTOR) {
+            revert DSCEngine__BreaksHealthFactor(userHealthFactor);
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -196,7 +204,7 @@ contract DSCEngine is ReentrancyGuard {
 
     function getUsdValue(address token, uint256 amount) public view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
-        (, int256 price, , , ) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.latestRoundData();
         return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
     }
 }
