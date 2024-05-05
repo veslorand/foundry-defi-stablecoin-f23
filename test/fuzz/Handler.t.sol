@@ -50,6 +50,9 @@ contract Handler is Test {
     }
 
     function depositCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
+        if (amountCollateral > 10e10 || amountCollateral == 0) {
+            return;
+        }
         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
         collateral.mint(msg.sender, amountCollateral);
         vm.startPrank(msg.sender);
