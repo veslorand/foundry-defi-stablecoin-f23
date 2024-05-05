@@ -9,7 +9,6 @@ pragma solidity ^0.8.19;
 // // users cant create stablecoins with a bad health factor
 // // a user should only be able to be liquidated if they have a bad health factor
 
-import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {Test, console} from "forge-std/Test.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
@@ -39,7 +38,7 @@ contract Invariants is StdInvariant, Test {
         (ethUsdPriceFeed, btcUsdPriceFeed, weth, wbtc,) = helperConfig.activeNetworkConfig();
         handler = new Handler(dsce, dsc);
         targetContract(address(handler));
-       // targetContract(address(dsce));
+        // targetContract(address(dsce));
     }
 
     // forge-config: default.invariant.fail-on-revert = false
@@ -51,6 +50,16 @@ contract Invariants is StdInvariant, Test {
         uint256 wethValue = dsce.getUsdValue(weth, wethDeposted);
         uint256 wbtcValue = dsce.getUsdValue(wbtc, wbtcDeposited);
 
+        console.log("wethValue: ", wethValue);
+        console.log("wbtcValue: ", wbtcValue);
+        console.log("totalSupply: ", totalSupply);
+        console.log("Times mint called: ", handler.timesMintIsCalled());
+
         assert(wethValue + wbtcValue >= totalSupply);
+    }
+
+    function invariant_gettersSholdNotRevert() public view {
+        dsce.getLiquidationBonus();
+        dsce.getPrecision();
     }
 }
